@@ -1,8 +1,18 @@
-from fastapi import Header, HTTPException
-from app.utils.db import supabase
+from fastapi import Request, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+import os
 
-def admin_required(x_user_email: str = Header(...)):
-    res = supabase.table("users").select("is_admin").eq("email", x_user_email).single().execute()
-    if not res.data or not res.data.get("is_admin"):
-        raise HTTPException(status_code=403, detail="Acesso negado")
-    return True
+JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET")
+JWT_ALGORITHM = "HS256"
+
+class JWTBearer(HTTPBearer):
+    async def __call__(self, request: Request):
+        cred: HTTPAuthorizationCredentials = await super().__call__(request)
+        token = cred.credentials if cred else None
+        try:
+            payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM], audience="authenticated")
+            request.state.user = payload
+            return payload
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
