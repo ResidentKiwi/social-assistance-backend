@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import login, email_verification
-from app.routes import cv, benefits
+from app.routes import cv, benefits, admin
+app.include_router(admin.router, prefix="/admin")
 
 app = FastAPI()
 
