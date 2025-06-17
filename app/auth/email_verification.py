@@ -1,12 +1,11 @@
-import secrets
-import time
 from fastapi import APIRouter, HTTPException
-from pydantic import EmailStr
+from pydantic import BaseModel, EmailStr
+import time
+import secrets
 from app.utils.email_sender import send_verification_email
+from app.utils.db import supabase
 
 router = APIRouter()
-
-codes = {}
 
 class EmailPayload(BaseModel):
     email: EmailStr
@@ -15,22 +14,21 @@ class EmailPayload(BaseModel):
 @router.post("/send-code")
 def send_code(data: EmailPayload):
     code = secrets.token_hex(3)
-    expires_at = time.time() + 900  # 15 minutos
-    codes[data.email] = {"code": code, "expires": expires_at, "attempts": 0}
+    expires = int(time.time()) + 900
+    supabase.table("email_codes").upsert({"email": data.email, "code": code, "expires": expires, "attempts": 0}).execute()
     send_verification_email(data.email, code)
-    return {"message": "Código enviado com sucesso"}
+    return {"message": "Código enviado"}
 
 @router.post("/verify-code")
-def verify_code(email: EmailStr, code: str):
-    if email not in codes:
-        raise HTTPException(status_code=400, detail="Código não encontrado")
-    entry = codes[email]
-    if time.time() > entry["expires"]:
-        raise HTTPException(status_code=400, detail="Código expirado")
-    if entry["attempts"] >= 3:
-        raise HTTPException(status_code=403, detail="Muitas tentativas erradas")
-    if code != entry["code"]:
-        codes[email]["attempts"] += 1
-        raise HTTPException(status_code=401, detail="Código inválido")
-    del codes[email]
-    return {"message": "Código verificado com sucesso"}
+def verify_code(data: EmailPayload, code: str):
+    resp = supabase.table("email_codes").select("*").eq("email", data.email).single().execute()
+    record = resp.data
+    if not record or int(time.time()) > record["expires"]:
+        raise HTTPException(status_code=400, detail="Código inválido ou expirado")
+    if record["attempts"] >= 3:
+        raise HTTPException(status_code=403, detail="Muitas tentativas")
+    if code != record["code"]:
+        supabase.table("email_codes").update({"attempts": record["attempts"] + 1}).eq("email", data.email).execute()
+        raise HTTPException(status_code=401, detail="Código incorreto")
+    supabase.table("email_codes").delete().eq("email", data.email).execute()
+    return {"message": "Verificado com sucesso"}
