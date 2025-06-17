@@ -6,4 +6,4 @@ pydantic
 email-validator
 httpx
 fpdf
-supabase-python
+supabase
