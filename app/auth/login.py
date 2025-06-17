@@ -1,10 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
+from app.utils.db import supabase
 
 router = APIRouter()
-
-# Simulação de banco de dados em memória
-users_db = {}
 
 class LoginData(BaseModel):
     email: EmailStr
@@ -12,8 +10,9 @@ class LoginData(BaseModel):
 
 @router.post("/login")
 def login_user(data: LoginData):
-    email = data.email
-    name = data.name
-    if email not in users_db:
-        users_db[email] = {"name": name}
-    return {"message": f"Login registrado para {name}", "email": email}
+    user = supabase.table("users").select("*").eq("email", data.email).single().execute()
+    if user.data is None:
+        res = supabase.table("users").insert({"email": data.email, "name": data.name}).execute()
+        if res.error:
+            raise HTTPException(status_code=500, detail="Erro ao criar usuário")
+    return {"message": "Login bem‑sucedido", "email": data.email}
