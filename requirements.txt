@@ -7,3 +7,4 @@ email-validator
 httpx
 fpdf
 supabase
+reportlab
