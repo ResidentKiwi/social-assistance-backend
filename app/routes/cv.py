@@ -12,60 +12,67 @@ async def generate_cv(data: dict, request: Request):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    y = height - 3*cm
+    y = height - 2.5*cm
 
-    def titulo(texto):
+    def section_title(text):
         nonlocal y
-        pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(2*cm, y, texto)
+        pdf.setFont("Helvetica-Bold", 12)
+        pdf.drawString(2*cm, y, text)
         y -= 0.5*cm
-        pdf.line(2*cm, y, width - 2*cm, y)
-        y -= 0.7*cm
 
-    def bloco(label, conteudo):
+    def write_block(label, content, spacing=0.4):
         nonlocal y
-        if conteudo:
-            if label:
-                pdf.setFont("Helvetica-Bold", 11)
-                pdf.drawString(2*cm, y, label)
-                y -= 0.4*cm
+        if content:
+            pdf.setFont("Helvetica-Bold", 10)
+            pdf.drawString(2*cm, y, f"{label}:")
+            y -= 0.35*cm
             pdf.setFont("Helvetica", 10)
-            for linha in conteudo.split('\n'):
-                if y < 2*cm:
-                    pdf.showPage()
-                    y = height - 3*cm
-                pdf.drawString(2.3*cm, y, linha.strip())
-                y -= 0.4*cm
+            for line in content.strip().split("\n"):
+                pdf.drawString(2.4*cm, y, line.strip())
+                y -= spacing*cm
             y -= 0.3*cm
 
-    # Cabeçalho com dados pessoais
-    pdf.setFont("Helvetica-Bold", 16)
+    # Cabeçalho com dados básicos
+    pdf.setFont("Helvetica-Bold", 14)
     pdf.drawString(2*cm, y, data["nome"])
-    y -= 0.8*cm
+    y -= 0.5*cm
     pdf.setFont("Helvetica", 10)
-    pdf.drawString(2*cm, y, f"E-mail: {data['email']} | Telefone: {data['telefone']}")
-    y -= 1.2*cm
+    pdf.drawString(2*cm, y, f"Email: {data['email']} | Telefone: {data['telefone']}")
+    y -= 0.4*cm
+    if data.get("cidade") or data.get("nascimento") or data.get("linkedin"):
+        if data.get("cidade"):
+            pdf.drawString(2*cm, y, f"Cidade/UF: {data['cidade']}")
+            y -= 0.4*cm
+        if data.get("nascimento"):
+            pdf.drawString(2*cm, y, f"Data de nascimento: {data['nascimento']}")
+            y -= 0.4*cm
+        if data.get("linkedin"):
+            pdf.drawString(2*cm, y, f"LinkedIn: {data['linkedin']}")
+            y -= 0.4*cm
+    y -= 0.5*cm
 
-    # Sessões com conteúdo
-    titulo("Objetivo Profissional")
-    bloco("", data["objetivo"])
+    # Blocos principais
+    section_title("Objetivo Profissional")
+    write_block("", data["objetivo"])
 
-    titulo("Formação Acadêmica")
-    bloco("", data["formacao"])
+    section_title("Formação Acadêmica")
+    write_block("", data["formacao"])
 
     if data.get("experiencia"):
-        titulo("Experiência Profissional")
-        bloco("", data["experiencia"])
+        section_title("Experiência Profissional")
+        write_block("", data["experiencia"])
 
     if data.get("cursos"):
-        titulo("Cursos e Qualificações")
-        bloco("", data["cursos"])
+        section_title("Cursos e Qualificações")
+        write_block("", data["cursos"])
 
     if data.get("extras"):
-        titulo("Informações Adicionais")
-        bloco("", data["extras"])
+        section_title("Informações Adicionais")
+        write_block("", data["extras"])
 
     pdf.showPage()
     pdf.save()
     buffer.seek(0)
-    return StreamingResponse(buffer, media_type='application/pdf', headers={"Content-Disposition": "attachment; filename=curriculo.pdf"})
+    return StreamingResponse(buffer, media_type='application/pdf', headers={
+        "Content-Disposition": "attachment; filename=curriculo.pdf"
+    })
