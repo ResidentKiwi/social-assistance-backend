@@ -1,18 +1,23 @@
 import httpx
 import os
 
-RESEND_API_KEY = "re_Yebznayf_3QcLfq1hL6GUs8LPGfxG4bpx"
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+SENDER_EMAIL = "onboarding@resend.dev"  # email verificado pela Resend
 
-def send_verification_email(email: str, code: str):
+def send_verification_email(to_email: str, code: str):
+    if not RESEND_API_KEY:
+        raise Exception("Resend API key não configurada")
+
     response = httpx.post(
         "https://api.resend.com/emails",
         headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
         json={
-            "from": "Portal Apoio <no-reply@meuportal.social>",
-            "to": [email],
-            "subject": "Código de verificação",
-            "html": f"<p>Seu código de verificação é: <strong>{code}</strong></p>"
+            "from": f"Portal Apoio <{SENDER_EMAIL}>",
+            "to": [to_email],
+            "subject": "Código de Verificação – Portal de Apoio Social",
+            "html": f"<p>Seu código de verificação é: <strong>{code}</strong></p><p>Ele expira em 15 minutos.</p>"
         }
     )
-    if response.status_code != 200:
-        raise Exception("Erro ao enviar e-mail")
+
+    if not (200 <= response.status_code < 300):
+        raise Exception(f"Erro ao enviar e-mail: {response.status_code} {response.text}")
