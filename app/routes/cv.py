@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import StreamingResponse
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
+from reportlab.lib.units import cm
 from io import BytesIO
 
 router = APIRouter()
@@ -11,56 +12,58 @@ async def generate_cv(data: dict, request: Request):
     buffer = BytesIO()
     pdf = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4
-    y = height - 50
+    y = height - 3*cm
 
-    def draw_title(text):
+    def titulo(texto):
         nonlocal y
         pdf.setFont("Helvetica-Bold", 14)
-        pdf.drawString(50, y, text)
-        y -= 20
-        pdf.setLineWidth(0.5)
-        pdf.line(50, y, width - 50, y)
-        y -= 20
+        pdf.drawString(2*cm, y, texto)
+        y -= 0.5*cm
+        pdf.line(2*cm, y, width - 2*cm, y)
+        y -= 0.7*cm
 
-    def draw_block(label, content):
+    def bloco(label, conteudo):
         nonlocal y
-        if content:
-            pdf.setFont("Helvetica-Bold", 12)
-            pdf.drawString(50, y, label)
-            y -= 15
-            pdf.setFont("Helvetica", 11)
-            for line in content.strip().split("\n"):
-                for subline in split_line(line, 100):
-                    pdf.drawString(60, y, subline)
-                    y -= 15
-            y -= 10
+        if conteudo:
+            if label:
+                pdf.setFont("Helvetica-Bold", 11)
+                pdf.drawString(2*cm, y, label)
+                y -= 0.4*cm
+            pdf.setFont("Helvetica", 10)
+            for linha in conteudo.split('\n'):
+                if y < 2*cm:
+                    pdf.showPage()
+                    y = height - 3*cm
+                pdf.drawString(2.3*cm, y, linha.strip())
+                y -= 0.4*cm
+            y -= 0.3*cm
 
-    def split_line(text, max_chars):
-        return [text[i:i+max_chars] for i in range(0, len(text), max_chars)]
-
-    # Cabeçalho
+    # Cabeçalho com dados pessoais
     pdf.setFont("Helvetica-Bold", 16)
-    pdf.drawString(50, y, data['nome'])
-    y -= 20
-    pdf.setFont("Helvetica", 11)
-    pdf.drawString(50, y, f"Email: {data['email']}   |   Telefone: {data['telefone']}")
-    y -= 30
+    pdf.drawString(2*cm, y, data["nome"])
+    y -= 0.8*cm
+    pdf.setFont("Helvetica", 10)
+    pdf.drawString(2*cm, y, f"E-mail: {data['email']} | Telefone: {data['telefone']}")
+    y -= 1.2*cm
 
-    # Blocos de conteúdo
-    draw_title("Objetivo Profissional")
-    draw_block("", data['objetivo'])
+    # Sessões com conteúdo
+    titulo("Objetivo Profissional")
+    bloco("", data["objetivo"])
 
-    draw_title("Formação Acadêmica")
-    draw_block("", data['formacao'])
+    titulo("Formação Acadêmica")
+    bloco("", data["formacao"])
 
-    draw_title("Experiência Profissional")
-    draw_block("", data.get('experiencia', ''))
+    if data.get("experiencia"):
+        titulo("Experiência Profissional")
+        bloco("", data["experiencia"])
 
-    draw_title("Cursos e Qualificações")
-    draw_block("", data.get('cursos', ''))
+    if data.get("cursos"):
+        titulo("Cursos e Qualificações")
+        bloco("", data["cursos"])
 
-    draw_title("Informações Complementares")
-    draw_block("", data.get('extras', ''))
+    if data.get("extras"):
+        titulo("Informações Adicionais")
+        bloco("", data["extras"])
 
     pdf.showPage()
     pdf.save()
