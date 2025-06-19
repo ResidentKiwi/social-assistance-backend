@@ -3,7 +3,7 @@ from pydantic import BaseModel, EmailStr
 import time, secrets
 from app.utils.db import supabase
 from app.utils.email_sender import send_verification_email
-from supabase_py import create_client
+from supabase import create_client
 
 router = APIRouter()
 
