@@ -2,7 +2,7 @@ import httpx
 import os
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY")
-SENDER_EMAIL = "onboarding@resend.dev"  # email verificado pela Resend
+SENDER_EMAIL = "contato@meuportalsocial.site"  # Substitua pelo e-mail real verificado no Resend
 
 def send_verification_email(to_email: str, code: str):
     if not RESEND_API_KEY:
