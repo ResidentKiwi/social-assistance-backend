@@ -6,21 +6,15 @@ router = APIRouter()
 
 class LoginData(BaseModel):
     email: EmailStr
-    name: str
+    password: str
 
 @router.post("/login")
 def login_user(data: LoginData):
-    resp = supabase.table("users").select("email", "name", "is_admin").eq("email", data.email).single().execute()
-    record = resp.data
-    if record is None:
-        res = supabase.table("users").insert({
-            "email": data.email,
-            "name": data.name
-        }).execute()
-        if res.error:
-            raise HTTPException(status_code=500, detail="Erro ao criar usuário")
-        is_admin = False
-    else:
-        is_admin = record.get("is_admin", False)
-
-    return {"email": data.email, "name": data.name, "is_admin": is_admin}
+    # Supabase Auth já trata as credenciais, então apenas retorna status
+    user_resp = supabase.auth.sign_in_with_password({
+        "email": data.email,
+        "password": data.password
+    })
+    if "error" in user_resp:
+        raise HTTPException(status_code=400, detail=user_resp["error"]["message"])
+    return {"message": "Login bem‑sucedido", "user": user_resp["data"]["user"]}
