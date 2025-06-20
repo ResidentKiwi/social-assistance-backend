@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel, EmailStr
-import time, random
+import time, secrets, random
 from app.utils.db import supabase
 from app.utils.email_sender import send_verification_email
 
@@ -14,16 +14,13 @@ class EmailPayload(BaseModel):
 
 @router.post("/send-code")
 def send_code(data: EmailPayload):
-    # Verifica se nome de usuário já existe
     existing = supabase.table("profiles").select("username").eq("username", data.username).execute()
     if existing.data:
         raise HTTPException(status_code=409, detail="Nome de usuário já em uso")
 
-    # Gera código numérico de 6 dígitos
     code = f"{random.randint(100000, 999999)}"
-    expires = int(time.time()) + 900  # expira em 15 minutos
+    expires = int(time.time()) + 900
 
-    # Salva o código e os dados temporários no Supabase
     supabase.table("email_codes").upsert({
         "email": data.email,
         "code": code,
@@ -41,7 +38,6 @@ def send_code(data: EmailPayload):
 
 @router.post("/verify-code")
 def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
-    # Busca o código no banco
     resp = supabase.table("email_codes").select("*").eq("email", data.email).single().execute()
     record = resp.data
 
@@ -56,14 +52,14 @@ def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
             .update({"attempts": record["attempts"] + 1}).eq("email", data.email).execute()
         raise HTTPException(status_code=401, detail="Código incorreto")
 
-    # Recupera dados temporários
     temp = record.get("temp_data") or {}
 
-    # Criação do usuário no Supabase Auth
+    # Criação de usuário sem envio de e-mail automático
     creation = supabase.auth.sign_up({
         "email": data.email,
         "password": temp["password"],
         "options": {
+            "emailRedirectTo": None,  # Evita disparo de e-mail
             "data": {
                 "name": temp["name"],
                 "username": temp["username"]
@@ -71,11 +67,8 @@ def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
         }
     })
 
-    # ❗ Correção: testando erro corretamente
-    if not creation.user:
+    if getattr(creation, "error", None):
         raise HTTPException(status_code=500, detail="Erro ao criar usuário")
 
-    # Limpa o código da tabela
     supabase.table("email_codes").delete().eq("email", data.email).execute()
-
     return {"message": "Conta criada com sucesso"}
