@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Body
 from pydantic import BaseModel, EmailStr
-import time, secrets, random
+import time, random
 from app.utils.db import supabase
 from app.utils.email_sender import send_verification_email
 
@@ -21,9 +21,9 @@ def send_code(data: EmailPayload):
 
     # Gera código numérico de 6 dígitos
     code = f"{random.randint(100000, 999999)}"
-    expires = int(time.time()) + 900  # 15 minutos
+    expires = int(time.time()) + 900  # expira em 15 minutos
 
-    # Salva código e dados temporários no Supabase
+    # Salva o código e os dados temporários no Supabase
     supabase.table("email_codes").upsert({
         "email": data.email,
         "code": code,
@@ -41,7 +41,7 @@ def send_code(data: EmailPayload):
 
 @router.post("/verify-code")
 def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
-    # Busca o registro do código enviado
+    # Busca o código no banco
     resp = supabase.table("email_codes").select("*").eq("email", data.email).single().execute()
     record = resp.data
 
@@ -56,10 +56,10 @@ def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
             .update({"attempts": record["attempts"] + 1}).eq("email", data.email).execute()
         raise HTTPException(status_code=401, detail="Código incorreto")
 
-    # Recupera dados temporários salvos
+    # Recupera dados temporários
     temp = record.get("temp_data") or {}
 
-    # Cria o usuário no Supabase Auth
+    # Criação do usuário no Supabase Auth
     creation = supabase.auth.sign_up({
         "email": data.email,
         "password": temp["password"],
@@ -71,10 +71,11 @@ def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
         }
     })
 
-    if creation.get("error"):
+    # ❗ Correção: testando erro corretamente
+    if not creation.user:
         raise HTTPException(status_code=500, detail="Erro ao criar usuário")
 
-    # Limpa código usado
+    # Limpa o código da tabela
     supabase.table("email_codes").delete().eq("email", data.email).execute()
 
     return {"message": "Conta criada com sucesso"}
