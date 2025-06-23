@@ -1,10 +1,12 @@
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, HTTPException, Query, Body, Depends
 from pydantic import BaseModel, EmailStr
-import time, random
-from app.utils.db import SessionLocal
+import time, secrets, random, jwt, os
+from app.utils.db import get_social_db
+from app.models import Users, EmailCodes  # definimos no ORM
 from app.utils.email_sender import send_verification_email
-from app.models import User, EmailCode, Profile
-import bcrypt
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = "HS256"
 
 router = APIRouter()
 
@@ -15,60 +17,48 @@ class EmailPayload(BaseModel):
     password: str
 
 @router.post("/send-code")
-def send_code(data: EmailPayload):
-    db = SessionLocal()
-    if db.query(Profile).filter(Profile.username == data.username).first():
-        raise HTTPException(status_code=409, detail="Nome de usuário já em uso")
+def send_code(data: EmailPayload, db=Depends(get_social_db)):
+    existing = db.query(Users).filter_by(username=data.username).first()
+    if existing: raise HTTPException(409, "Nome de usuário já em uso")
 
     code = f"{random.randint(100000, 999999)}"
     expires = int(time.time()) + 900
+    temp = {"name": data.name, "username": data.username, "password": data.password}
 
-    # insere ou atualiza
-    obj = db.query(EmailCode).filter(EmailCode.email == data.email).first()
-    if not obj:
-        obj = EmailCode(email=data.email)
-    obj.code = code
-    obj.expires = expires
-    obj.attempts = 0
-    obj.temp_name = data.name
-    obj.temp_username = data.username
-    obj.temp_password_hash = bcrypt.hashpw(data.password.encode(), bcrypt.gensalt()).decode()
-    db.add(obj); db.commit()
+    entry = db.query(EmailCodes).filter_by(email=data.email).first()
+    if entry:
+        entry.code = code
+        entry.expires = expires
+        entry.attempts = 0
+        entry.temp_data = temp
+    else:
+        db.add(EmailCodes(email=data.email, code=code, expires=expires, attempts=0, temp_data=temp))
+    db.commit()
 
     send_verification_email(data.email, code)
-    return {"message": "Código de verificação enviado."}
-
+    return {"message": "Código enviado"}
 
 @router.post("/verify-code")
-def verify_code(code: str = Query(...), data: EmailPayload = Body(...)):
-    db = SessionLocal()
-    rec = db.query(EmailCode).filter(EmailCode.email == data.email).first()
+def verify_code(code: str = Query(...), data: EmailPayload = Body(...), db=Depends(get_social_db)):
+    rec = db.query(EmailCodes).filter_by(email=data.email).first()
     if not rec or time.time() > rec.expires:
-        raise HTTPException(status_code=400, detail="Código expirado ou inválido")
+        raise HTTPException(400, "Código expirado ou inválido")
     if rec.attempts >= 3:
-        raise HTTPException(status_code=403, detail="Muitas tentativas inválidas")
+        raise HTTPException(403, "Muitas tentativas")
     if rec.code != code:
         rec.attempts += 1
         db.commit()
-        raise HTTPException(status_code=401, detail="Código incorreto")
+        raise HTTPException(401, "Código incorreto")
 
-    # cria usuário
-    pw = rec.temp_password_hash.encode()
-    new_user = User(
-        email = data.email,
-        password_hash = pw,
-        name = rec.temp_name,
-        username = rec.temp_username
-    )
-    db.add(new_user); db.commit()
-    db.refresh(new_user)
-
-    # cria perfil padrão
-    profile = Profile(user_id=new_user.id, is_admin=False)
-    db.add(profile)
-
-    # remove o código usado
+    temp = rec.temp_data
+    # cria o usuário
+    user = Users(name=temp["name"], username=temp["username"], email=data.email)
+    user.set_password(temp["password"])
+    db.add(user)
     db.delete(rec)
     db.commit()
 
-    return {"message": "Conta criada com sucesso"}
+    # criamos token JWT
+    token = jwt.encode({"sub": user.id, "exp": time.time() + 3600}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+    return {"message": "Conta criada", "token": token}
