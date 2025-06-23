@@ -9,3 +9,5 @@ python-multipart
 reportlab
 python-jose
 passlib[bcrypt]
+PyJWT
+mysql-connector-python
