@@ -1,8 +1,11 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
-from app.utils.db import SessionLocal
-from app.models import User
-import bcrypt
+import time, jwt, os
+from app.utils.db import get_social_db
+from app.models import Users
+
+JWT_SECRET = os.getenv("JWT_SECRET")
+JWT_ALGORITHM = "HS256"
 
 router = APIRouter()
 
@@ -11,21 +14,10 @@ class LoginData(BaseModel):
     password: str
 
 @router.post("/login")
-def login_user(data: LoginData):
-    db = SessionLocal()
-    user = db.query(User).filter(User.email == data.email).first()
-    if not user:
-        raise HTTPException(status_code=400, detail="Credenciais inválidas")
+def login_user(data: LoginData, db=Depends(get_social_db)):
+    user = db.query(Users).filter_by(email=data.email).first()
+    if not user or not user.check_password(data.password):
+        raise HTTPException(400, "Credenciais inválidas")
 
-    if not bcrypt.checkpw(data.password.encode(), user.password_hash):
-        raise HTTPException(status_code=400, detail="Credenciais inválidas")
-
-    # A implementação abaixo é um exemplo com JWT
-    from app.utils.auth import create_access_token
-    token = create_access_token({"sub": str(user.id), "is_admin": user.is_admin})
-    return {
-        "message": "Login bem‑sucedido",
-        "access_token": token,
-        "token_type": "bearer",
-        "user": { "id": user.id, "email": user.email, "username": user.username, "name": user.name }
-    }
+    token = jwt.encode({"sub": user.id, "exp": time.time() + 3600}, JWT_SECRET, algorithm=JWT_ALGORITHM)
+    return {"message": "Login bem‑sucedido", "token": token, "user": {"name": user.name, "username": user.username, "email": user.email, "is_admin": user.is_admin}}
