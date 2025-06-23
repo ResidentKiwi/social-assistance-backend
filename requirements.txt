@@ -1,10 +1,11 @@
 fastapi
 uvicorn[standard]
-jinja2
-python-multipart
+sqlalchemy
+aiomysql
 pydantic
 email-validator
 httpx
-fpdf
-supabase
+python-multipart
 reportlab
+python-jose
+passlib[bcrypt]
