@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
-from app.utils.db import supabase
+from app.utils.db import SessionLocal
+from app.models import User
+import bcrypt
 
 router = APIRouter()
 
@@ -10,11 +12,20 @@ class LoginData(BaseModel):
 
 @router.post("/login")
 def login_user(data: LoginData):
-    # Supabase Auth já trata as credenciais, então apenas retorna status
-    user_resp = supabase.auth.sign_in_with_password({
-        "email": data.email,
-        "password": data.password
-    })
-    if "error" in user_resp:
-        raise HTTPException(status_code=400, detail=user_resp["error"]["message"])
-    return {"message": "Login bem‑sucedido", "user": user_resp["data"]["user"]}
+    db = SessionLocal()
+    user = db.query(User).filter(User.email == data.email).first()
+    if not user:
+        raise HTTPException(status_code=400, detail="Credenciais inválidas")
+
+    if not bcrypt.checkpw(data.password.encode(), user.password_hash):
+        raise HTTPException(status_code=400, detail="Credenciais inválidas")
+
+    # A implementação abaixo é um exemplo com JWT
+    from app.utils.auth import create_access_token
+    token = create_access_token({"sub": str(user.id), "is_admin": user.is_admin})
+    return {
+        "message": "Login bem‑sucedido",
+        "access_token": token,
+        "token_type": "bearer",
+        "user": { "id": user.id, "email": user.email, "username": user.username, "name": user.name }
+    }
