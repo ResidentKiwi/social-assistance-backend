@@ -17,10 +17,8 @@ class JWTBearer(HTTPBearer):
             payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
             request.state.user = payload
             return payload
-        except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token expirado")
         except JWTError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Token inválido ou expirado")
 
 async def admin_required(request: Request, db=Depends(get_social_db)):
     uid = request.state.user.get("sub")
