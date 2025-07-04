@@ -1,10 +1,9 @@
 # app/models.py
 
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy import (
-    Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey
-)
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON, ForeignKey
 import datetime
+from passlib.hash import bcrypt
 
 Base = declarative_base()
 
@@ -18,6 +17,12 @@ class Users(Base):
     is_admin = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime, default=datetime.datetime.utcnow, nullable=False)
 
+    def set_password(self, password: str):
+        self.password_hash = bcrypt.hash(password)
+
+    def check_password(self, password: str) -> bool:
+        return bcrypt.verify(password, self.password_hash)
+
 class Profiles(Base):
     __tablename__ = 'profiles'
     id = Column(Integer, primary_key=True)
@@ -30,11 +35,9 @@ class EmailCodes(Base):
     id = Column(Integer, primary_key=True)
     email = Column(String(255), unique=True, nullable=False, index=True)
     code = Column(String(10), nullable=False)
-    expires = Column(Integer, nullable=False)   # epoch timestamp
+    expires = Column(Integer, nullable=False)
     attempts = Column(Integer, default=0, nullable=False)
     temp_data = Column(JSON, nullable=True)
-
-# Se houver rotas adicionais (cv, benefits, admin), adicione os modelos correspondentes, por exemplo:
 
 class CVRequests(Base):
     __tablename__ = 'cv_requests'
