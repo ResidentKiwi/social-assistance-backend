@@ -12,7 +12,7 @@ origins = [
     "http://jpzex.ddns.net",   # seu frontend Vite
     "https://social-assistance-backend.onrender.com",
 
-
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,         # domínios específicos para CORS
