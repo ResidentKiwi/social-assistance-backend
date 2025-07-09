@@ -7,16 +7,15 @@ from app.routes import auth, cv, benefits, admin
 
 app = FastAPI()
 
-# Configuração CORS (domínio do seu frontend)
+# Configuração CORS para permitir chamadas do frontend em jpzex.ddns.net
 origins = [
-    "http://jpzex.ddns.net",
-    "https://jpzex.ddns.net",  # se usar HTTPS no futuro
-    "http://localhost:5173",   # útil para testes locais
-]
+    "http://jpzex.ddns.net",   # seu frontend Vite
+    "https://social-assistance-backend.onrender.com",
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,       # domínios permitidos
+    allow_origins=origins,         # domínios específicos para CORS
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
