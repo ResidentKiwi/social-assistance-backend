@@ -2,27 +2,26 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-# Importação das rotas
 from app.routes import auth, cv, benefits, admin
 
 app = FastAPI()
 
-# Configuração CORS para permitir chamadas do frontend em jpzex.ddns.net
+# Domínio exato do frontend Vite
 origins = [
-    "http://jpzex.ddns.net",   # seu frontend Vite
-    "https://social-assistance-backend.onrender.com",
-
+    "http://jpzex.ddns.net",
 ]
+
+# Inserindo CORS antes de incluir as rotas
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,         # domínios específicos para CORS
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Registro das rotas
-app.include_router(auth.router)
+# Registro das rotas - deixando prefix apenas em auth
+app.include_router(auth.router, prefix="/auth")
 app.include_router(cv.router, prefix="/cv")
 app.include_router(benefits.router, prefix="/benefits")
 app.include_router(admin.router, prefix="/admin")
