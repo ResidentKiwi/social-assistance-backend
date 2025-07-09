@@ -7,10 +7,16 @@ from app.routes import auth, cv, benefits, admin
 
 app = FastAPI()
 
-# Configuração CORS
+# Configuração CORS (domínio do seu frontend)
+origins = [
+    "http://jpzex.ddns.net",
+    "https://jpzex.ddns.net",  # se usar HTTPS no futuro
+    "http://localhost:5173",   # útil para testes locais
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Substitua por domínio específico na produção
+    allow_origins=origins,       # domínios permitidos
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
